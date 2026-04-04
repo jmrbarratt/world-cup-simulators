@@ -1128,7 +1128,7 @@ function renderContent(){
         <div class="champion-sub">64 matches · ${S.allGoalscorers.length} goals · ${(S.allGoalscorers.length/64).toFixed(2)} per game</div>
       </div>
       <div style="text-align:center;margin:16px 0 28px;">
-        <button class="report-gen-btn" onclick="generateReport()">📰 GENERATE TOURNAMENT REPORT</button>
+        <button class="report-gen-btn" onclick="${S.generatedReport ? 'openSavedReport()' : 'generateReport()'}">📰 ${S.generatedReport ? 'READ TOURNAMENT REPORT' : 'GENERATE TOURNAMENT REPORT'}</button>
       </div>`;
     }
     const cnt={};
@@ -1483,14 +1483,30 @@ Do not mention this is a simulation. Write as if you were there.`;
     const el = document.getElementById('report-text');
     el.innerHTML = `<div style="font-family:'Oswald',sans-serif;font-size:22px;font-weight:700;letter-spacing:1px;text-align:center;color:var(--white);margin-bottom:16px;line-height:1.3;">${headline}</div><div style="white-space:pre-wrap;">${body}</div>`;
 
+    // Save the report to state
+    S.generatedReport = el.innerHTML;
+
     document.getElementById('report-loading').classList.add('hidden');
     el.classList.remove('hidden');
+
+    // Re-render to update button text
+    renderAll();
 
   } catch(err) {
     document.getElementById('report-loading').classList.add('hidden');
     document.getElementById('report-error').classList.remove('hidden');
     document.getElementById('report-error').textContent = 'Could not generate report: ' + err.message;
   }
+}
+
+// Open previously generated report
+function openSavedReport(){
+  if(!S.generatedReport) return;
+  document.getElementById('report-text').innerHTML = S.generatedReport;
+  document.getElementById('report-loading').classList.add('hidden');
+  document.getElementById('report-error').classList.add('hidden');
+  document.getElementById('report-text').classList.remove('hidden');
+  document.getElementById('report-overlay').classList.add('open');
 }
 
 // Set sticky offset based on actual header height
