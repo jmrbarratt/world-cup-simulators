@@ -640,7 +640,26 @@ const T = {
 // HELPERS
 function wc(squad){const tot=squad.reduce((s,p)=>s+p[1],0);let r=Math.random()*tot;for(const p of squad){r-=p[1];if(r<=0)return p[0];}return squad[squad.length-1][0];}
 function simGoals(atk,def,squad,mins){const gp=atk*def/10000;const out=[];for(let i=0;i<mins;i++){if(Math.random()<gp/90)out.push([wc(squad),i+1]);}return out;}
-function simMatch(t1,t2){const hs=simGoals(t1.attack,t2.defence,t1.squad,90);const as=simGoals(t2.attack,t1.defence,t2.squad,90);return{homeScorers:hs,awayScorers:as,hg:hs.length,ag:as.length,et:false,pen:false,winner:null};}
+function simMatch(t1,t2){
+  const hs=simGoals(t1.attack,t2.defence,t1.squad,90);
+  const as=simGoals(t2.attack,t1.defence,t2.squad,90);
+  
+  // Calculate goal power for upset detection
+  const hgp = t1.attack * t2.defence / 10000;
+  const agp = t2.attack * t1.defence / 10000;
+  
+  return{
+    homeScorers:hs,
+    awayScorers:as,
+    hg:hs.length,
+    ag:as.length,
+    et:false,
+    pen:false,
+    winner:null,
+    hgp:hgp,  // Store goal powers for upset calculation later
+    agp:agp
+  };
+}
 function simKO(t1,t2){
   let r=simMatch(t1,t2);
   if(r.hg===r.ag){
@@ -1343,66 +1362,196 @@ function closeReport(){
 
 function buildTournamentSummary(){
   const q = S.queue;
-
-  // Group stage match results
-  const groupMatchLines = [];
-  for(const item of q.slice(0, 48)){
-    if(!item.result) continue;
-    const r = item.result;
-    let line = `${item.group}: ${item.t1.country} ${r.hg}-${r.ag} ${item.t2.country}`;
-    const scorers = [];
-    if(r.homeScorers.length) scorers.push(r.homeScorers.map(s=>`${s[0]} ${s[1]}'`).join(', '));
-    if(r.awayScorers.length) scorers.push(r.awayScorers.map(s=>`${s[0]} ${s[1]}'`).join(', '));
-    if(scorers.length) line += ` (${scorers.join('; ')})`;
-    if(item.stadium) line += ` — ${item.stadium}`;
-    groupMatchLines.push(line);
-  }
-
-  // Group standings
-  const groupLines = [];
-  for(const [gname,gd] of Object.entries(S.groupData)){
-    const sorted = [...gd.teams.map((t,i)=>({t,s:gd.stats[i]}))].sort((a,b)=>b.s.pts-a.s.pts||b.s.gd-a.s.gd||b.s.f-a.s.f);
-    groupLines.push(gname+': '+sorted.map((x,i)=>`${i+1}. ${x.t.country} (${x.s.pts}pts, ${x.s.f}-${x.s.a})`).join(', '));
-  }
-
-  // Knockout results
-  const koLines = [];
+  
+  // Calculate tournament stats
+  const totalGoals = S.allGoalscorers.length;
+  const champion = S.champion ? S.champion.country : 'Unknown';
+  let penaltyCount = 0;
+  let goldenGoalCount = 0;
   for(const item of q.slice(48)){
-    if(!item.result) continue;
-    const r = item.result;
-    let line = `${item.roundLabel}: ${item.t1.country} ${r.hg}-${r.ag} ${item.t2.country}`;
-    const scorers = [];
-    if(r.homeScorers.length) scorers.push(r.homeScorers.map(s=>`${s[0]} ${s[1]}'`).join(', '));
-    if(r.awayScorers.length) scorers.push(r.awayScorers.map(s=>`${s[0]} ${s[1]}'`).join(', '));
-    if(scorers.length) line += ` (${scorers.join('; ')})`;
-    if(r.pen) line += ` — ${r.winner.country} win on penalties`;
-    else if(r.et) line += ` — Golden Goal`;
-    if(item.stadium) line += ` — ${item.stadium}`;
-    koLines.push(line);
+    if(item.result?.pen) penaltyCount++;
+    if(item.result?.et) goldenGoalCount++;
   }
-
+  
   // Top scorers
   const cnt={};
   for(const [name,team] of S.allGoalscorers){
     if(!cnt[name])cnt[name]={g:0,country:team.country};
     cnt[name].g++;
   }
-  const topScorers = Object.entries(cnt).sort((a,b)=>b[1].g-a[1].g).slice(0,5)
-    .map(([name,{g,country}])=>`${name} (${country}) ${g} goals`).join(', ');
+  const allScorers = Object.entries(cnt).sort((a,b)=>b[1].g-a[1].g);
+  
+  // Get golden boot winner and top 3 (with ties)
+  const topScorersList = [];
+  if(allScorers.length > 0){
+    const goldenBoot = allScorers[0];
+    topScorersList.push(`${goldenBoot[0]} (${goldenBoot[1].country}) - ${goldenBoot[1].g} goals`);
+    
+    const remainingScorers = allScorers.slice(1);
+    const secondPlaceGoals = remainingScorers[0]?.[1]?.g;
+    const thirdPlaceGoals = remainingScorers.filter(s => s[1].g < secondPlaceGoals)[0]?.[1]?.g;
+    
+    for(const [name, {g, country}] of remainingScorers){
+      if(g === secondPlaceGoals || g === thirdPlaceGoals){
+        topScorersList.push(`${name} (${country}) - ${g} goals`);
+      }
+    }
+  }
+  
+  // Helper to format match detail
+  const formatMatch = (item, includeRound = false) => {
+    const r = item.result;
+    const isHome = item.t1 === S.champion || item.t1 === runnerUp;
+    const team = isHome ? item.t1.country : item.t2.country;
+    const opponent = isHome ? item.t2.country : item.t1.country;
+    const score = isHome ? `${r.hg}-${r.ag}` : `${r.ag}-${r.hg}`;
+    
+    const scorers = [];
+    if(r.homeScorers.length) scorers.push(r.homeScorers.map(s=>`${s[0]} ${s[1]}'`).join(', '));
+    if(r.awayScorers.length) scorers.push(r.awayScorers.map(s=>`${s[0]} ${s[1]}'`).join(', '));
+    
+    let line = includeRound ? `${item.roundLabel || item.group}: ` : '';
+    line += `${item.t1.country} ${r.hg}-${r.ag} ${item.t2.country}`;
+    if(scorers.length) line += ` (${scorers.join('; ')})`;
+    if(r.pen) line += ` — ${r.winner.country} win on penalties`;
+    else if(r.et) line += ` — Golden Goal`;
+    if(item.stadium) line += ` — ${item.stadium}`;
+    
+    return line;
+  };
+  
+  // Build finalists' paths with full match details
+  let championPathLines = [];
+  let runnerUpPathLines = [];
+  const finalMatch = q[63];
+  const runnerUp = finalMatch?.result ? (finalMatch.result.winner === finalMatch.t1 ? finalMatch.t2 : finalMatch.t1) : null;
+  
+  if(S.champion){
+    for(const item of q){
+      if(item.result && (item.t1 === S.champion || item.t2 === S.champion)){
+        championPathLines.push(formatMatch(item, true));
+      }
+    }
+  }
+  
+  if(runnerUp){
+    for(const item of q){
+      if(item.result && (item.t1 === runnerUp || item.t2 === runnerUp)){
+        runnerUpPathLines.push(formatMatch(item, true));
+      }
+    }
+  }
+  
+  // Collect curated dramatic matches
+  const shocks = [];
+  const upsets = [];
+  const highScoring = [];
+  const intenseKnockouts = [];
+  
+  for(const item of q){
+    if(!item.result) continue;
+    const r = item.result;
+    
+    // Check for upsets
+    let isShock = false;
+    let isUpset = false;
+    if((item.phase === 'group' && r.hg !== r.ag) || item.phase === 'knockout'){
+      const gpDiff = Math.abs(r.hgp - r.agp);
+      const isHomeWin = item.phase === 'group' ? r.hg > r.ag : r.winner === item.t1;
+      const weakerWon = isHomeWin ? r.hgp < r.agp : r.agp < r.hgp;
+      
+      if(weakerWon){
+        if(gpDiff >= 1.0) isShock = true;
+        else if(gpDiff >= 0.7) isUpset = true;
+      }
+    }
+    
+    // Check for high-scoring
+    const totalGoals = r.hg + r.ag;
+    const isHighScoring = totalGoals >= 6;
+    
+    // Check for intense knockouts (penalties or golden goals)
+    const isIntense = item.phase === 'knockout' && (r.pen || r.et);
+    
+    if(isShock) shocks.push(formatMatch(item, true));
+    else if(isUpset) upsets.push(formatMatch(item, true));
+    if(isHighScoring) highScoring.push(formatMatch(item, true));
+    if(isIntense) intenseKnockouts.push(formatMatch(item, true));
+  }
+  
+  // Build full reference data
+  const groupMatchLines = [];
+  for(const item of q.slice(0, 48)){
+    if(!item.result) continue;
+    groupMatchLines.push(formatMatch(item, false).replace(/^/, item.group + ': '));
+  }
+  
+  const groupLines = [];
+  for(const [gname,gd] of Object.entries(S.groupData)){
+    const sorted = [...gd.teams.map((t,i)=>({t,s:gd.stats[i]}))].sort((a,b)=>b.s.pts-a.s.pts||b.s.gd-a.s.gd||b.s.f-a.s.f);
+    groupLines.push(gname+': '+sorted.map((x,i)=>`${i+1}. ${x.t.country} (${x.s.pts}pts, ${x.s.f}-${x.s.a})`).join(', '));
+  }
+  
+  const koLines = [];
+  for(const item of q.slice(48)){
+    if(!item.result) continue;
+    koLines.push(formatMatch(item, true));
+  }
+  
+  // Build curated summary
+  let curatedSummary = `═══════════════════════════════════════════════════════════
+EDITORIAL HIGHLIGHTS — FIFA WORLD CUP KOREA/JAPAN 2002
+═══════════════════════════════════════════════════════════
 
-  const totalGoals = S.allGoalscorers.length;
-  const champion = S.champion ? S.champion.country : 'Unknown';
+CHAMPION: ${champion}
+Runner-up: ${runnerUp ? runnerUp.country : 'Unknown'}
 
-  return `TOURNAMENT DATA — FIFA WORLD CUP KOREA/JAPAN 2002 SIMULATION
-\nCHAMPION: ${champion}
-TOTAL GOALS: ${totalGoals} in 64 matches
-\nGROUP STAGE RESULTS:
+TOURNAMENT STATISTICS:
+- 64 matches, ${totalGoals} goals (${(totalGoals/64).toFixed(2)} per game)
+- ${penaltyCount} penalty shootouts, ${goldenGoalCount} golden goals
+
+TOP SCORERS:
+${topScorersList.join('\n')}
+
+CHAMPION'S JOURNEY (all 7 matches):
+${championPathLines.join('\n')}
+
+RUNNER-UP'S JOURNEY (all 7 matches):
+${runnerUpPathLines.join('\n')}`;
+
+  if(shocks.length){
+    curatedSummary += `\n\nMAJOR SHOCKS (significant underdog victories):\n${shocks.join('\n')}`;
+  }
+  
+  if(upsets.length){
+    curatedSummary += `\n\nNOTABLE UPSETS:\n${upsets.join('\n')}`;
+  }
+  
+  if(highScoring.length){
+    curatedSummary += `\n\nHIGH-SCORING THRILLERS (6+ goals):\n${highScoring.join('\n')}`;
+  }
+  
+  if(intenseKnockouts.length){
+    curatedSummary += `\n\nINTENSE KNOCKOUT DRAMA (penalties/golden goals):\n${intenseKnockouts.join('\n')}`;
+  }
+  
+  // Build full reference data
+  const fullData = `
+
+═══════════════════════════════════════════════════════════
+FULL TOURNAMENT DATA (for reference and fact-checking)
+═══════════════════════════════════════════════════════════
+
+GROUP STAGE RESULTS:
 ${groupMatchLines.join('\n')}
-\nGROUP STAGE FINAL STANDINGS:
+
+GROUP STAGE FINAL STANDINGS:
 ${groupLines.join('\n')}
-\nKNOCKOUT RESULTS:
-${koLines.join('\n')}
-\nTOP SCORERS: ${topScorers}`;
+
+KNOCKOUT RESULTS:
+${koLines.join('\n')}`;
+
+  return curatedSummary + fullData;
 }
 
 async function generateReport(){
@@ -1415,48 +1564,45 @@ async function generateReport(){
 
   const summary = buildTournamentSummary();
 
-  const prompt = `You are a veteran football journalist writing immediately after the 2002 World Cup final.
-
-Using ONLY the verified tournament data below, write a vivid ~500-word report capturing the drama and defining moments of the tournament.
+  const prompt = `You are a veteran football journalist writing the definitive retrospective on the 2002 FIFA World Cup in South Korea and Japan for a prestigious football magazine. Based on the tournament data below, craft an evocative 500-word piece that captures the drama, poetry, and spirit of the competition.
 
 ${summary}
 
-STRICT FACT RULES:
-- Use only facts explicitly stated in the data.
-- Do NOT change or invent match results, scorers, or events.
-- Do NOT infer details that are not clearly stated.
-- If you are unsure about a detail, leave it out.
+INSTRUCTIONS:
+Write your report using the EDITORIAL HIGHLIGHTS section. This contains all the tournament's most important moments pre-selected for you:
+- The complete journeys of both finalists (all 7 matches with full detail)
+- Tournament statistics (goals per game, penalties, golden goals)
+- Top goalscorers  
+- Major shocks, notable upsets, high-scoring thrillers, and intense knockout drama
 
-WRITING STYLE:
-- Lyrical flair of a seasoned football journalist who witnessed the tournament firsthand
-- Evocative imagery, narrative arc of great sports writing, not bullet points
-- Include detail of results and description of important goals
+Only consult the FULL TOURNAMENT DATA section if you need additional context like group standings or details about matches not in the highlights.
 
-YOU MAY EMBELLISH:
-- How goals were scored (e.g. long-range strike, header, etc.)
-- Atmosphere (crowd, tension, setting)
-- General descriptions of performances
+STYLE: Write with the lyrical flair of a seasoned reporter who witnessed it all firsthand. Use vivid imagery, memorable turns of phrase, and the narrative arc of great sports writing. Balance poetry with concrete detail.
 
-YOU MUST NOT INVENT:
-- Goals, scorers, or scorelines
-- Match outcomes or tournament progression
-- Events (e.g. penalties, golden goals) unless explicitly stated
+CONTENT TO WEAVE IN:
+- South Korea and Japan as co-hosts (first Asian World Cup, crowd atmosphere)
+- The champion's and runner-up's complete journeys (already provided with all match details)
+- Shock eliminations or fairy-tale runs  
+- Individual brilliance (standout performers, match-winners, breakthrough stars)
+- Pivotal moments: late goals, penalty shootouts, golden goals
+- Tournament character based on the statistics provided
 
-CONTENT TO INCLUDE:
-- The champion and their path to victory (only if clearly supported by the data)
-- First Asian World Cup
-- The performance of the hosts, South Korea and Japan (only if clearly supported by the data)
-- Key matches and defining moments (choose only from clearly important results)
-- Any big upsets (only if clearly supported by the data)
-- Notable individual performances (top scorers, standout players)
-- Overall character of the tournament (based on total goals and results)
+CRITICAL RULES:
+- Include specific scorelines for key matches (e.g., "Germany's 8-0 demolition of Saudi Arabia")
+- 2 goals = brace, not hat-trick
+- Stick strictly to facts in the data
 
-FORMAT:
-Headline (plain text, NO #, no markdown, no formatting symbols)
+YOU MAY embellish: How goals were scored, atmosphere, penalty drama details
+YOU MUST NOT invent: Scores, scorers, results, match-ups, rounds, or events not in the data
 
-Then 4–5 flowing paragraphs (~500 words total). No lists or subheadings.
+CONTEXT (use if relevant):
+32 teams, May 31 - June 30, 2002
+Previous World Cup wins: Brazil 4 (1994); Germany 3 (1990); Italy 3 (1982); Argentina 2 (1986); Uruguay 2 (1950); France 1 (1998); England 1 (1966)
+Debutants: China, Ecuador, Senegal, Slovenia
 
-Do not mention that this is a simulation.`;
+FORMAT: Headline (plain text, no formatting), blank line, then flowing prose (~500 words). No bullet points or section headers. Write as if for a Sunday supplement.
+
+Do not mention this is a simulation. Write as if you were there.`;
 
   try {
     const response = await fetch('/api/report', {
