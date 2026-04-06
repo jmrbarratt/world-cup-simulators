@@ -636,26 +636,7 @@ const T = {
 // HELPERS
 function wc(squad){const tot=squad.reduce((s,p)=>s+p[1],0);let r=Math.random()*tot;for(const p of squad){r-=p[1];if(r<=0)return p[0];}return squad[squad.length-1][0];}
 function simGoals(atk,def,squad,mins){const gp=atk*def/10000;const out=[];for(let i=0;i<mins;i++){if(Math.random()<gp/90)out.push([wc(squad),i+1]);}return out;}
-function simMatch(t1,t2){
-  const hs=simGoals(t1.attack,t2.defence,t1.squad,90);
-  const as=simGoals(t2.attack,t1.defence,t2.squad,90);
-  
-  // Calculate goal power for upset detection
-  const hgp = t1.attack * t2.defence / 10000;
-  const agp = t2.attack * t1.defence / 10000;
-  
-  return{
-    homeScorers:hs,
-    awayScorers:as,
-    hg:hs.length,
-    ag:as.length,
-    et:false,
-    pen:false,
-    winner:null,
-    hgp:hgp,  // Store goal powers for upset calculation later
-    agp:agp
-  };
-}
+function simMatch(t1,t2){const hs=simGoals(t1.attack,t2.defence,t1.squad,90);const as=simGoals(t2.attack,t1.defence,t2.squad,90);return{homeScorers:hs,awayScorers:as,hg:hs.length,ag:as.length,et:false,pen:false,winner:null};}
 function simKO(t1,t2){
   let r=simMatch(t1,t2);
   if(r.hg===r.ag){
@@ -1266,28 +1247,7 @@ function buildTournamentSummary(){
   for(const item of q.slice(0, 48)){
     if(!item.result) continue;
     const r = item.result;
-    
-    // Check for upsets and high-scoring in group stage
-    let upsetFlag = '';
-    let scoringFlag = '';
-    
-    // Only check upsets for wins (not draws)
-    if(r.hg !== r.ag){
-      const gpDiff = Math.abs(r.hgp - r.agp);
-      const isHomeWin = r.hg > r.ag;
-      const weakerWon = isHomeWin ? r.hgp < r.agp : r.agp < r.hgp;
-      
-      if(weakerWon){
-        if(gpDiff >= 1.0) upsetFlag = ' [SHOCK]';
-        else if(gpDiff >= 0.7) upsetFlag = ' [UPSET]';
-      }
-    }
-    
-    // Check for high-scoring
-    const totalGoals = r.hg + r.ag;
-    if(totalGoals >= 6) scoringFlag = ' [HIGH-SCORING]';
-    
-    let line = `${item.group}: ${item.t1.country} ${r.hg}-${r.ag} ${item.t2.country}${upsetFlag}${scoringFlag}`;
+    let line = `${item.group}: ${item.t1.country} ${r.hg}-${r.ag} ${item.t2.country}`;
     const scorers = [];
     if(r.homeScorers.length) scorers.push(r.homeScorers.map(s=>`${s[0]} ${s[1]}'`).join(', '));
     if(r.awayScorers.length) scorers.push(r.awayScorers.map(s=>`${s[0]} ${s[1]}'`).join(', '));
@@ -1308,28 +1268,7 @@ function buildTournamentSummary(){
   for(const item of q.slice(48)){
     if(!item.result) continue;
     const r = item.result;
-    
-    // Check for upsets and high-scoring in knockout stage
-    let upsetFlag = '';
-    let scoringFlag = '';
-    
-    // Check upset based on who progressed (winner)
-    if(r.winner){
-      const gpDiff = Math.abs(r.hgp - r.agp);
-      const isHomeWinner = r.winner === item.t1;
-      const weakerWon = isHomeWinner ? r.hgp < r.agp : r.agp < r.hgp;
-      
-      if(weakerWon){
-        if(gpDiff >= 1.0) upsetFlag = ' [SHOCK]';
-        else if(gpDiff >= 0.7) upsetFlag = ' [UPSET]';
-      }
-    }
-    
-    // Check for high-scoring
-    const totalGoals = r.hg + r.ag;
-    if(totalGoals >= 6) scoringFlag = ' [HIGH-SCORING]';
-    
-    let line = `${item.roundLabel}: ${item.t1.country} ${r.hg}-${r.ag} ${item.t2.country}${upsetFlag}${scoringFlag}`;
+    let line = `${item.roundLabel}: ${item.t1.country} ${r.hg}-${r.ag} ${item.t2.country}`;
     const scorers = [];
     if(r.homeScorers.length) scorers.push(r.homeScorers.map(s=>`${s[0]} ${s[1]}'`).join(', '));
     if(r.awayScorers.length) scorers.push(r.awayScorers.map(s=>`${s[0]} ${s[1]}'`).join(', '));
@@ -1346,68 +1285,11 @@ function buildTournamentSummary(){
     if(!cnt[name])cnt[name]={g:0,country:team.country};
     cnt[name].g++;
   }
-  const allScorers = Object.entries(cnt).sort((a,b)=>b[1].g-a[1].g);
-  
-  // Get golden boot winner and top 3 (with ties)
-  const topScorersList = [];
-  if(allScorers.length > 0){
-    const goldenBoot = allScorers[0];
-    topScorersList.push(`${goldenBoot[0]} (${goldenBoot[1].country}) ${goldenBoot[1].g} goals`);
-    
-    // Get 2nd and 3rd place scorers, including ties
-    const remainingScorers = allScorers.slice(1);
-    const secondPlaceGoals = remainingScorers[0]?.[1]?.g;
-    const thirdPlaceGoals = remainingScorers.filter(s => s[1].g < secondPlaceGoals)[0]?.[1]?.g;
-    
-    for(const [name, {g, country}] of remainingScorers){
-      if(g === secondPlaceGoals || g === thirdPlaceGoals){
-        topScorersList.push(`${name} (${country}) ${g} goals`);
-      }
-    }
-  }
-  const topScorers = topScorersList.join(', ');
+  const topScorers = Object.entries(cnt).sort((a,b)=>b[1].g-a[1].g).slice(0,5)
+    .map(([name,{g,country}])=>`${name} (${country}) ${g} goals`).join(', ');
 
   const totalGoals = S.allGoalscorers.length;
   const champion = S.champion ? S.champion.country : 'Unknown';
-  
-  // Build finalists' paths (champion and runner-up)
-  let finalistsPaths = '';
-  const finalMatch = q[63]; // Final is match 64 (index 63)
-  if(finalMatch && finalMatch.result && S.champion){
-    const runnerUp = finalMatch.result.winner === finalMatch.t1 ? finalMatch.t2 : finalMatch.t1;
-    
-    // Helper function to build a team's path
-    const buildPath = (team) => {
-      const path = [];
-      // Group stage
-      for(const item of q.slice(0, 48)){
-        if(item.result && (item.t1 === team || item.t2 === team)){
-          const r = item.result;
-          const isHome = item.t1 === team;
-          const score = isHome ? `${r.hg}-${r.ag}` : `${r.ag}-${r.hg}`;
-          const opponent = isHome ? item.t2.country : item.t1.country;
-          path.push(`${opponent} ${score}`);
-        }
-      }
-      // Knockout stage
-      for(const item of q.slice(48)){
-        if(item.result && (item.t1 === team || item.t2 === team)){
-          const r = item.result;
-          const isHome = item.t1 === team;
-          const score = isHome ? `${r.hg}-${r.ag}` : `${r.ag}-${r.hg}`;
-          const opponent = isHome ? item.t2.country : item.t1.country;
-          let suffix = '';
-          if(r.pen && r.winner === team) suffix = ' (won on pens)';
-          else if(r.pen && r.winner !== team) suffix = ' (lost on pens)';
-          else if(r.et) suffix = ' (golden goal)';
-          path.push(`${item.roundLabel}: ${opponent} ${score}${suffix}`);
-        }
-      }
-      return path.join(', ');
-    };
-    
-    finalistsPaths = `\nCHAMPION'S PATH: ${buildPath(S.champion)}\nRUNNER-UP'S PATH (${runnerUp.country}): ${buildPath(runnerUp)}`;
-  }
 
   return `TOURNAMENT DATA — FIFA WORLD CUP FRANCE 1998 SIMULATION
 
@@ -1419,7 +1301,7 @@ ${groupMatchLines.join('\n')}
 ${groupLines.join('\n')}
 \nKNOCKOUT RESULTS:
 ${koLines.join('\n')}
-\nTOP SCORERS: ${topScorers}${finalistsPaths}`;
+\nTOP SCORERS: ${topScorers}`;
 }
 
 async function generateReport(){
@@ -1432,58 +1314,47 @@ async function generateReport(){
 
   const summary = buildTournamentSummary();
 
-  const prompt = `You are a veteran football journalist writing the definitive retrospective on the 1998 FIFA World Cup in France for a prestigious football magazine. Based on the tournament data below, craft an evocative 500-word piece that captures the drama, poetry, and spirit of the competition.
+  const prompt = `You are a veteran football journalist writing immediately after the 1998 World Cup final.
+
+Using ONLY the verified tournament data below, write a vivid ~400-word report capturing the drama and defining moments of the tournament.
 
 ${summary}
 
-STYLE: Write with the lyrical flair of a seasoned reporter who witnessed it all firsthand. Use vivid imagery, memorable turns of phrase, and the narrative arc of great sports writing. This should read like classic World Cup reportage—atmospheric, dramatic, human. Balance poetry with concrete detail.
+STRICT FACT RULES:
+- Use only facts explicitly stated in the data.
+- Do NOT change or invent match results, scorers, or events.
+- Do NOT infer details that are not clearly stated.
+- If you are unsure about a detail, leave it out.
 
-CONTENT TO WEAVE IN:
-- The champion's path to glory (their complete journey is provided above)
-- The runner-up's journey to the final (their complete journey is provided above)
-- France as hosts (the weight of expectation, crowd atmosphere)
-- Shock eliminations or fairy-tale runs that defined the tournament
-- Individual brilliance (top scorers listed above, match-winners, breakthrough stars)
-- Pivotal moments: last-minute goals, penalty shootouts, golden goals—pick the most dramatic from the data and bring them to life
-- The tournament's character: Was it free-flowing? Defensive? Full of upsets? High or low-scoring overall?
+WRITING STYLE:
+- Lyrical flair of a seasoned football journalist who witnessed the tournament firsthand
+- Evocative imagery, narrative arc of great sports writing, not bullet points
+- Include detail of results and description of important goals
 
-IMPORTANT - MATCHES TAGGED FOR YOUR ATTENTION:
-- [SHOCK] = Major upset where a significantly weaker team triumphed
-- [UPSET] = Notable upset where the underdog won
-- [HIGH-SCORING] = Spectacular high-scoring encounter (6+ goals)
-These tagged matches are the most dramatic moments—prioritize them in your narrative and include specific scorelines.
+YOU MAY EMBELLISH:
+- How goals were scored (e.g. long-range strike, header, etc.)
+- Atmosphere (crowd, tension, setting)
+- General descriptions of performances
 
-INCLUDE SPECIFIC MATCH DETAILS:
-- Reference actual scorelines from memorable matches, especially high-scoring games and upsets
-- When mentioning a match, give the score (e.g., "Brazil's 4-1 demolition of Chile" not just "Brazil beat Chile")
-- Highlight standout individual performances with specific goal tallies where relevant
-- Ground your narrative in concrete results while maintaining evocative prose
+YOU MUST NOT INVENT:
+- Goals, scorers, or scorelines
+- Match outcomes or tournament progression
+- Events (e.g. penalties, golden goals) unless explicitly stated
 
-CRITICAL - CREATIVE LICENSE BOUNDARIES:
-You may ONLY embellish these types of details:
-- HOW a goal was scored: "thunderbolt from 25 yards," "deft chip over the advancing keeper," "header from a corner"
-- Atmosphere: crowd reactions, weather conditions, stadium descriptions
-- Penalty shootout drama: which player scored/missed the decisive penalty, heroic goalkeeper saves (but only for matches that actually went to penalties in the data)
-- Descriptive language about player performances
+CONTENT TO INCLUDE:
+- The champion and their path to victory (only if clearly supported by the data)
+- The performance of the hosts, France (only if clearly supported by the data)
+- Key matches and defining moments (choose only from clearly important results)
+- Any big upsets (only if clearly supported by the data)
+- Notable individual performances (top scorers, standout players)
+- Overall character of the tournament (based on total goals and results)
 
-You must NOT invent or alter:
-- Match scores or results
-- Who scored goals or how many goals a player scored
-- Which teams played which teams
-- Which round matches occurred in
-- Whether matches went to penalties or had golden goals (only use if stated in the data)
+FORMAT:
+Headline (plain text, NO #, no markdown, no formatting symbols)
 
-If a player scored 2 goals, that is a brace, not a hat-trick. Stick strictly to the facts provided.
+Then 3–5 flowing paragraphs (~400 words total). No lists or subheadings.
 
-You may draw upon this key tournament info where relevant:
-
-32 teams, June 10 - July 12, 1998
-Number of previous World Cup wins and year they last won: Brazil 4 (1994); Germany 3 (1990); Italy 3 (1982); Argentina 2 (1986); Uruguay 2 (1950); England 1 (1966)
-Debutants at 1998 World Cup: Croatia, Jamaica, Japan, South Africa
-
-FORMAT: Begin with a captivating headline (no formatting, just plain text), then a blank line, then flowing prose paragraphs (about 500 words total). No bullet points, no section headers. Write as if for print in a Sunday supplement.
-
-Do not mention this is a simulation. Write as if you were there.`;
+Do not mention that this is a simulation.`;
 
   try {
     const response = await fetch('/api/report', {
