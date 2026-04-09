@@ -1504,17 +1504,25 @@ async function generateReport(){
 
   const summary = buildTournamentSummary();
 
-  const prompt = `Write a vivid 600-word retrospective on the 2002 FIFA World Cup in South Korea and Japan, the day after the final, as if you were there. Do not mention this is a simulation.
+  const prompt = `You are a veteran football journalist writing the definitive retrospective on the 2002 FIFA World Cup in South Korea and Japan for a prestigious football magazine, the day after the final. Based on the tournament data below, craft an evocative 600-word piece that captures the drama, poetry, and spirit of the competition.
 
 ${summary}
 
-Tags highlight key moments: [SHOCK]/[UPSET]=upsets | [HIGH-SCORING]=6+ goals | [HAT-TRICK]=3+ | [GOLDEN GOAL]/[PENALTIES]=drama | [CHAMPION]/[RUNNER-UP]=finalists
+UNDERSTANDING THE DATA:
+Matches are tagged to help you identify key moments:
+- [SHOCK] / [UPSET] = Significant underdog victories worth highlighting
+- [HIGH-SCORING] = 6+ goal thrillers
+- [HAT-TRICK: Player Name] = Player scored 3+ goals in this match
+- [GOLDEN GOAL] / [PENALTIES] = Dramatic knockout conclusions
+- [CHAMPION] / [RUNNER-UP] = Matches involving the finalists
 
 Stick to the match results, scores, and stages in the data. But bring it to life: describe how goals were scored, the atmosphere, celebrations, the emotion. Make it feel real.
 
-(32 teams, 64 matches, May 31-June 30, 2002. Debutants: China, Ecuador, Senegal, Slovenia)
+(32 teams, 64 matches, May 31-June 30 2002. Debutants: China, Ecuador, Senegal, Slovenia.)
 
-FORMAT: Headline (plain text, no formatting, no #), blank line, then flowing prose (~600 words). No bullet points or section headers.`;
+FORMAT: Headline (plain text, no formatting, no #), blank line, then flowing prose (~600 words). No bullet points or section headers. Write as if for a Sunday supplement.
+
+Do not mention this is a simulation. Write as if you were there.`;
 
   try {
     const response = await fetch('/api/report', {
