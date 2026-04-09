@@ -1504,46 +1504,17 @@ async function generateReport(){
 
   const summary = buildTournamentSummary();
 
-  const prompt = `You are a veteran football journalist writing the definitive retrospective on the 2002 FIFA World Cup in South Korea and Japan for a prestigious football magazine, the day after the final. Based on the tournament data below, craft an evocative 600-word piece that captures the drama, poetry, and spirit of the competition.
+  const prompt = `Write a vivid 600-word retrospective on the 1998 FIFA World Cup in France, the day after the final, as if you were there. Do not mention this is a simulation.
 
 ${summary}
 
-UNDERSTANDING THE DATA:
-Matches are tagged to help you identify key moments:
-- [SHOCK] / [UPSET] = Significant underdog victories worth highlighting
-- [HIGH-SCORING] = 6+ goal thrillers
-- [HAT-TRICK: Player Name] = Player scored 3+ goals in this match
-- [GOLDEN GOAL] / [PENALTIES] = Dramatic knockout conclusions
-- [CHAMPION] / [RUNNER-UP] = Matches involving the finalists
+Tags highlight key moments: [SHOCK]/[UPSET]=upsets | [HIGH-SCORING]=6+ goals | [HAT-TRICK]=3+ | [GOLDEN GOAL]/[PENALTIES]=drama | [CHAMPION]/[RUNNER-UP]=finalists
 
-Use these tags to quickly spot the tournament's most dramatic moments, but don't feel constrained by them—tell the story as you see fit.
+Stick to the match results, scores, and stages in the data. But bring it to life: describe how goals were scored, the atmosphere, celebrations, the emotion. Make it feel real.
 
-STYLE: Write with the lyrical flair of a seasoned reporter who witnessed it all firsthand. Use vivid imagery, memorable turns of phrase, and the narrative arc of great sports writing. Balance poetry with concrete detail.
+(32 teams, June 10-July 12, 1998. Debutants: Croatia, Jamaica, Japan, South Africa)
 
-CONTENT TO WEAVE IN:
-- Summary of the final
-- The champion's and runner-up's journeys to the final
-- South Korea and Japan as co-hosts (first Asian World Cup, crowd atmosphere)
-- Shock eliminations or fairy-tale runs  
-- Individual brilliance (top scorers, standout performances, match-winners, breakthrough stars)
-- Pivotal moments: late goals, penalty shootouts, golden goals
-- Tournament character based on total number of goals and the nature of matches
-
-CRITICAL RULES:
-- Include specific scorelines for key matches (e.g., "Germany's 8-0 demolition of Saudi Arabia")
-- Stick strictly to facts in the data
-- YOU MAY embellish: How goals were scored, atmosphere, penalty drama details
-- YOU MUST NOT invent: Scores, scorers, results, match-ups, rounds, or events not in the data
-
-CONTEXT (use if relevant):
-32 teams, 64 matches, May 31 - June 30, 2002
-Holders: France
-Debutants: China, Ecuador, Senegal, Slovenia
-Previous World Cup wins: Brazil 4 (1994); Germany 3 (1990); Italy 3 (1982); Argentina 2 (1986); Uruguay 2 (1950); France 1 (1998); England 1 (1966)
-
-FORMAT: Headline (plain text, no formatting, no #), blank line, then flowing prose (~600 words). No bullet points or section headers. Write as if for a Sunday supplement.
-
-Do not mention this is a simulation. Write as if you were there.`;
+FORMAT: Headline (plain text, no formatting, no #), blank line, then flowing prose (~600 words). No bullet points or section headers.`;
 
   try {
     const response = await fetch('/api/report', {
