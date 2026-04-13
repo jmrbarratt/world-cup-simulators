@@ -1504,7 +1504,7 @@ async function generateReport(){
 
   const summary = buildTournamentSummary();
 
-  const prompt = `You are a veteran football journalist writing the definitive retrospective on the 2002 FIFA World Cup in South Korea and Japan for a prestigious football magazine, the day after the final. Based on the tournament data below, craft an evocative 600-word piece that captures the drama, poetry, and spirit of the competition.
+  const prompt = `You are a veteran football journalist writing the definitive retrospective on the 2002 FIFA World Cup in South Korea and Japan for a prestigious football magazine, shortly after the final. Based on the tournament data below, craft an evocative 600-word piece that captures the drama, poetry, and spirit of the competition.
 
 ${summary}
 
@@ -1516,14 +1516,18 @@ Matches are tagged to help you identify key moments:
 - [GOLDEN GOAL] / [PENALTIES] = Dramatic knockout conclusions
 - [CHAMPION] / [RUNNER-UP] = Matches involving the finalists
 
-Content you may choose to include:
+CONTENT YOU MAY INCLUDE:
 - Summary of the final
 - Champion's and runner-up's journeys to the final
-- Japan and Korea as hosts (first Asian World Cup)
-- Best games (shocks/upsets, high-scoring)
-- Star players and top scorers
+- Japan and Korea as hosts (first Asian World Cup, crowd atmosphere)
+- Shock eliminations or fairytale runs
+- Late goals, penalty shootouts, golden goals
+- Memorable games (high-scoring, shocks and upsets)
+- Individual brilliance (top goalscorers, standout performances, match-winners, breakthrough stars)
 
-Stick to the match results, scores, and stages in the data. But bring it to life: describe how goals were scored, the atmosphere, celebrations, the emotion. Make it feel real.
+STYLE:
+- Write with the lyrical flair of a seasoned reporter who witnessed it all firsthand. Use vivid imagery, memorable turns of phrase, and the narrative arc of great sports writing.
+- Stick to the match results, scores, and stages in the data. But bring it to life: describe how goals were scored, the atmosphere, celebrations, the emotion. Make it feel real.
 Note: a player scoring twice in a match is a "brace".
 
 CONTEXT:
