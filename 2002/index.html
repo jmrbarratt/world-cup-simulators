@@ -640,19 +640,70 @@ const T = {
 // HELPERS
 function wc(squad){const tot=squad.reduce((s,p)=>s+p[1],0);let r=Math.random()*tot;for(const p of squad){r-=p[1];if(r<=0)return p[0];}return squad[squad.length-1][0];}
 function simGoals(atk,def,squad,mins){const gp=atk*def/10000;const out=[];for(let i=0;i<mins;i++){if(Math.random()<gp/90)out.push([wc(squad),i+1]);}return out;}
+function resolveMinuteClashes(homeScorers, awayScorers, maxMinute = 90) {
+  // Collect all goals with their team identifier
+  const allGoals = [
+    ...homeScorers.map(g => ({scorer: g[0], minute: g[1], team: 'home'})),
+    ...awayScorers.map(g => ({scorer: g[0], minute: g[1], team: 'away'}))
+  ];
+  
+  // Find all used minutes
+  const usedMinutes = new Set(allGoals.map(g => g.minute));
+  
+  // Find all available unused minutes
+  const availableMinutes = [];
+  for (let i = 1; i <= maxMinute; i++) {
+    if (!usedMinutes.has(i)) {
+      availableMinutes.push(i);
+    }
+  }
+  
+  // Find clashes and resolve them
+  const minuteCounts = {};
+  for (const goal of allGoals) {
+    minuteCounts[goal.minute] = (minuteCounts[goal.minute] || 0) + 1;
+  }
+  
+  // For each minute that has multiple goals, reassign extras to unused minutes
+  for (const [minute, count] of Object.entries(minuteCounts)) {
+    if (count > 1) {
+      const min = parseInt(minute);
+      const clashingGoals = allGoals.filter(g => g.minute === min);
+      
+      // Keep first goal at this minute, reassign the rest
+      for (let i = 1; i < clashingGoals.length; i++) {
+        if (availableMinutes.length > 0) {
+          // Pick a random available minute
+          const randomIndex = Math.floor(Math.random() * availableMinutes.length);
+          const newMinute = availableMinutes.splice(randomIndex, 1)[0];
+          clashingGoals[i].minute = newMinute;
+        }
+      }
+    }
+  }
+  
+  // Separate back into home and away
+  const newHomeScorers = allGoals.filter(g => g.team === 'home').map(g => [g.scorer, g.minute]);
+  const newAwayScorers = allGoals.filter(g => g.team === 'away').map(g => [g.scorer, g.minute]);
+  
+  return { homeScorers: newHomeScorers, awayScorers: newAwayScorers };
+}
 function simMatch(t1,t2){
   const hs=simGoals(t1.attack,t2.defence,t1.squad,90);
   const as=simGoals(t2.attack,t1.defence,t2.squad,90);
+  
+  // Resolve any same-minute goals
+  const resolved = resolveMinuteClashes(hs, as, 90);
   
   // Calculate goal power for upset detection
   const hgp = t1.attack * t2.defence / 10000;
   const agp = t2.attack * t1.defence / 10000;
   
   return{
-    homeScorers:hs,
-    awayScorers:as,
-    hg:hs.length,
-    ag:as.length,
+    homeScorers:resolved.homeScorers,
+    awayScorers:resolved.awayScorers,
+    hg:resolved.homeScorers.length,
+    ag:resolved.awayScorers.length,
     et:false,
     pen:false,
     winner:null,
@@ -670,7 +721,18 @@ function simKO(t1,t2){
     for(let i=0;i<30&&!ggScored;i++){
       const hGoal=Math.random()<hgp/90;
       const aGoal=Math.random()<agp/90;
-      if(hGoal){
+      if(hGoal && aGoal){
+        // Both scored - randomly pick winner to avoid home bias
+        if(Math.random()<0.5){
+          const scorer=wc(t1.squad);
+          r.homeScorers.push([scorer,i+91]);
+          r.hg++;r.et=true;ggScored=true;
+        }else{
+          const scorer=wc(t2.squad);
+          r.awayScorers.push([scorer,i+91]);
+          r.ag++;r.et=true;ggScored=true;
+        }
+      }else if(hGoal){
         const scorer=wc(t1.squad);
         r.homeScorers.push([scorer,i+91]);
         r.hg++;r.et=true;ggScored=true;
@@ -688,6 +750,74 @@ function simKO(t1,t2){
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=0|Math.random()*(i+1);[a[i],a[j]]=[a[j],a[i]];}}
 function groupFails(teams,lim){const c={};for(const t of teams)c[t.confed]=(c[t.confed]||0)+1;return Object.entries(c).some(([k,v])=>v>(lim[k]||0));}
 
+// World Cup sorting: pts, GD, GF, then head-to-head
+function sortGroupWorldCup(gd){
+  const teams = gd.teams.map((t,i) => ({t, s:gd.stats[i], idx:i}));
+  
+  // Sort by points, GD, GF first
+  teams.sort((a,b) => b.s.pts - a.s.pts || b.s.gd - a.s.gd || b.s.f - a.s.f);
+  
+  // Find groups of tied teams (tied on pts, gd, AND gf)
+  const groups = [];
+  let currentGroup = [teams[0]];
+  for(let i = 1; i < teams.length; i++){
+    if(teams[i].s.pts === currentGroup[0].s.pts && 
+       teams[i].s.gd === currentGroup[0].s.gd && 
+       teams[i].s.f === currentGroup[0].s.f){
+      currentGroup.push(teams[i]);
+    } else {
+      groups.push(currentGroup);
+      currentGroup = [teams[i]];
+    }
+  }
+  groups.push(currentGroup);
+  
+  // Apply head-to-head for tied groups with 2+ teams
+  const sorted = [];
+  for(const group of groups){
+    if(group.length === 1){
+      sorted.push(group[0]);
+    } else {
+      // Calculate head-to-head records for this tied group
+      const h2hStats = group.map(team => {
+        let pts = 0, gf = 0, ga = 0;
+        for(const opponent of group){
+          if(team.idx === opponent.idx) continue;
+          const key1 = `${team.idx}_${opponent.idx}`;
+          const key2 = `${opponent.idx}_${team.idx}`;
+          if(gd.h2h[key1]){
+            const hg = gd.h2h[key1].gf;
+            const ag = gd.h2h[key1].ga;
+            gf += hg; ga += ag;
+            if(hg > ag) pts += 3;
+            else if(hg === ag) pts += 1;
+          } else if(gd.h2h[key2]){
+            const hg = gd.h2h[key2].ga;
+            const ag = gd.h2h[key2].gf;
+            gf += hg; ga += ag;
+            if(hg > ag) pts += 3;
+            else if(hg === ag) pts += 1;
+          }
+        }
+        return {...team, h2h: {pts, gf, ga, gd: gf - ga}};
+      });
+      
+      // Sort by h2h: points, then GD, then GF, then overall GD, then overall GF
+      h2hStats.sort((a,b) => 
+        b.h2h.pts - a.h2h.pts ||
+        b.h2h.gd - a.h2h.gd ||
+        b.h2h.gf - a.h2h.gf ||
+        b.s.gd - a.s.gd ||
+        b.s.f - a.s.f
+      );
+      sorted.push(...h2hStats);
+    }
+  }
+  
+  return sorted;
+}
+
+
 // STATE
 let S = {};
 
@@ -704,7 +834,7 @@ function initRealGroups(){
   };
   const groupData={};
   for(const[gname,teams]of Object.entries(draw)){
-    groupData[gname]={teams,stats:teams.map(()=>({p:0,w:0,d:0,l:0,f:0,a:0,gd:0,pts:0})),};
+    groupData[gname]={teams,stats:teams.map(()=>({p:0,w:0,d:0,l:0,f:0,a:0,gd:0,pts:0})),h2h:{}};
   }
   const GROUP_FIXTURES = [
     {group:'Group A',t1idx:0,t2idx:1,stadium:'Seoul',     date:'31 May'},
@@ -850,7 +980,7 @@ function initTournament(){
   }
   const groupData={};
   for(const[gname,teams]of Object.entries(draw)){
-    groupData[gname]={teams,stats:teams.map(()=>({p:0,w:0,d:0,l:0,f:0,a:0,gd:0,pts:0})),};
+    groupData[gname]={teams,stats:teams.map(()=>({p:0,w:0,d:0,l:0,f:0,a:0,gd:0,pts:0})),h2h:{}};
   }
   // Fixtures in real tournament date/match order with stadium and date
   const GROUP_FIXTURES = [
@@ -917,7 +1047,7 @@ function initTournament(){
 function buildKnockout(){
   const winners=[],runnersUp=[];
   for(const gd of Object.values(S.groupData)){
-    const sorted=[...gd.teams.map((t,i)=>({t,s:gd.stats[i]}))].sort((a,b)=>b.s.pts-a.s.pts||b.s.gd-a.s.gd||b.s.f-a.s.f);
+    const sorted = sortGroupWorldCup(gd);
     winners.push(sorted[0].t);runnersUp.push(sorted[1].t);
   }
   // winners/runnersUp indexed A=0,B=1,C=2,D=3,E=4,F=5,G=6,H=7
@@ -999,6 +1129,11 @@ function processItem(item){
     if(r.hg>r.ag){s1.w++;s1.pts+=3;s2.l++;}
     else if(r.hg<r.ag){s2.w++;s2.pts+=3;s1.l++;}
     else{s1.d++;s1.pts++;s2.d++;s2.pts++;}
+    
+    // Record head-to-head result
+    const h2hKey = `${item.t1idx}_${item.t2idx}`;
+    gd.h2h[h2hKey] = {gf: r.hg, ga: r.ag};
+    
     r.homeScorers.forEach(s=>S.allGoalscorers.push([s[0],item.t1]));
     r.awayScorers.forEach(s=>S.allGoalscorers.push([s[0],item.t2]));
   }else{
@@ -1080,7 +1215,7 @@ function renderContent(){
   let h='';
   h+='<div class="groups-grid">';
   for(const[gname,gd]of Object.entries(S.groupData)){
-    const sorted=[...gd.teams.map((t,i)=>({t,s:gd.stats[i]}))].sort((a,b)=>b.s.pts-a.s.pts||b.s.gd-a.s.gd||b.s.f-a.s.f);
+    const sorted = sortGroupWorldCup(gd);
     h+=`<div class="group-card"><div class="group-name">${gname}</div>
       <table class="group-table"><thead><tr><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>F</th><th>A</th><th>GD</th><th>Pts</th></tr></thead>
       <tbody>${sorted.map((x,i)=>`<tr>
@@ -1417,10 +1552,17 @@ function buildTournamentSummary(){
     
     if(tags.length) line += ` ${tags.join(' ')}`;
     
-    const scorers = [];
-    if(r.homeScorers.length) scorers.push(r.homeScorers.map(s=>`${s[0]} ${s[1]}'`).join(', '));
-    if(r.awayScorers.length) scorers.push(r.awayScorers.map(s=>`${s[0]} ${s[1]}'`).join(', '));
-    if(scorers.length) line += ` (${scorers.join('; ')})`;
+    // Combine and sort goals chronologically
+    const allGoals = [
+      ...r.homeScorers.map(s => ({country: item.t1.country, scorer: s[0], minute: s[1]})),
+      ...r.awayScorers.map(s => ({country: item.t2.country, scorer: s[0], minute: s[1]}))
+    ];
+    allGoals.sort((a, b) => a.minute - b.minute);
+    
+    if(allGoals.length) {
+      const scorerStr = allGoals.map(g => `${g.country}, ${g.scorer} ${g.minute}'`).join('; ');
+      line += ` (${scorerStr})`;
+    }
     
     if(r.pen) line += ` — ${r.winner.country} win on penalties`;
     else if(r.et) line += ` — Golden Goal`;
@@ -1429,18 +1571,28 @@ function buildTournamentSummary(){
     return line;
   };
 
-  // Group stage match results
-  const groupMatchLines = [];
-  for(const item of q.slice(0, 48)){
-    const line = formatMatch(item);
-    if(line) groupMatchLines.push(line);
-  }
-
-  // Group standings
-  const groupLines = [];
-  for(const [gname,gd] of Object.entries(S.groupData)){
-    const sorted = [...gd.teams.map((t,i)=>({t,s:gd.stats[i]}))].sort((a,b)=>b.s.pts-a.s.pts||b.s.gd-a.s.gd||b.s.f-a.s.f);
-    groupLines.push(gname+': '+sorted.map((x,i)=>`${i+1}. ${x.t.country} (${x.s.pts}pts, ${x.s.f}-${x.s.a})`).join(', '));
+  // Group stage - organize by group (results + standings together)
+  const groupSections = [];
+  const groupOrder = ['Group A', 'Group B', 'Group C', 'Group D', 'Group E', 'Group F', 'Group G', 'Group H'];
+  
+  for(const gname of groupOrder){
+    const gd = S.groupData[gname];
+    
+    // Get matches for this group
+    const groupMatches = q.slice(0, 48).filter(item => item.group === gname);
+    const matchLines = [];
+    for(const item of groupMatches){
+      const line = formatMatch(item);
+      if(line) matchLines.push(line);
+    }
+    
+    // Get standings for this group (using World Cup sorting: pts, GD, GF, then h2h)
+    const sorted = sortGroupWorldCup(gd);
+    const standingLine = gname+': '+sorted.map((x,i)=>`${i+1}. ${x.t.country} (${x.s.pts}pts, ${x.s.f}-${x.s.a})`).join(', ');
+    
+    // Add group section with matches followed by standings
+    groupSections.push(matchLines.join('\n'));
+    groupSections.push(standingLine);
   }
 
   // Knockout results
@@ -1482,11 +1634,10 @@ CHAMPION: ${champion}
 Runner-up: ${runnerUp ? runnerUp.country : 'Unknown'}
 TOTAL GOALS: ${totalGoals} in 64 matches (${(totalGoals/64).toFixed(2)} per game)
 
-GROUP STAGE RESULTS:
-${groupMatchLines.join('\n')}
+NOTE: Teams are ranked by: (1) Points, (2) Goal Difference, (3) Goals For, (4) Head-to-Head record (if tied on all three)
 
-GROUP STAGE FINAL STANDINGS:
-${groupLines.join('\n')}
+GROUP STAGE:
+${groupSections.join('\n\n')}
 
 KNOCKOUT RESULTS:
 ${koLines.join('\n')}
