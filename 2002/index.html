@@ -682,9 +682,9 @@ function resolveMinuteClashes(homeScorers, awayScorers, maxMinute = 90) {
     }
   }
   
-  // Separate back into home and away
-  const newHomeScorers = allGoals.filter(g => g.team === 'home').map(g => [g.scorer, g.minute]);
-  const newAwayScorers = allGoals.filter(g => g.team === 'away').map(g => [g.scorer, g.minute]);
+  // Separate back into home and away, and sort by minute
+  const newHomeScorers = allGoals.filter(g => g.team === 'home').map(g => [g.scorer, g.minute]).sort((a, b) => a[1] - b[1]);
+  const newAwayScorers = allGoals.filter(g => g.team === 'away').map(g => [g.scorer, g.minute]).sort((a, b) => a[1] - b[1]);
   
   return { homeScorers: newHomeScorers, awayScorers: newAwayScorers };
 }
