@@ -745,7 +745,7 @@ function simKO(t1,t2){
     }
     if(!ggScored) r.pen=true;
   }
-  if(r.hg>r.ag)r.winner=t1;else if(r.ag>r.hg)r.winner=t2;else r.winner=Math.random()>0.5?t1:t2;
+  if(r.hg>r.ag)r.winner=t1;else if(r.ag>r.hg)r.winner=t2;else{const t1PenWeight=Math.sqrt(t1.attack);const t2PenWeight=Math.sqrt(t2.attack);const t1PenProb=t1PenWeight/(t1PenWeight+t2PenWeight);r.winner=Math.random()<t1PenProb?t1:t2;}
   return r;
 }
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=0|Math.random()*(i+1);[a[i],a[j]]=[a[j],a[i]];}}
