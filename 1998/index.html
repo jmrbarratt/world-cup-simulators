@@ -636,7 +636,7 @@ const T = {
 
 // HELPERS
 function wc(squad){const tot=squad.reduce((s,p)=>s+p[1],0);let r=Math.random()*tot;for(const p of squad){r-=p[1];if(r<=0)return p[0];}return squad[squad.length-1][0];}
-function simGoals(atk,def,squad,mins){const gp=atk*def/10000;const out=[];for(let i=0;i<mins;i++){if(Math.random()<gp/90)out.push([wc(squad),i+1]);}return out;}
+function simGoals(atk,def,squad,mins){const gp=1.05*atk*def/10000;const out=[];for(let i=0;i<mins;i++){if(Math.random()<gp/90)out.push([wc(squad),i+1]);}return out;}
 function resolveMinuteClashes(homeScorers, awayScorers, maxMinute = 90) {
   // Collect all goals with their team identifier
   const allGoals = [
@@ -693,8 +693,8 @@ function simMatch(t1,t2){
   const resolved = resolveMinuteClashes(hs, as, 90);
   
   // Calculate goal power for upset detection
-  const hgp = t1.attack * t2.defence / 10000;
-  const agp = t2.attack * t1.defence / 10000;
+  const hgp = 1.05 * t1.attack * t2.defence / 10000;
+  const agp = 1.05 * t2.attack * t1.defence / 10000;
   
   return{
     homeScorers:resolved.homeScorers,
@@ -712,8 +712,8 @@ function simKO(t1,t2){
   let r=simMatch(t1,t2);
   if(r.hg===r.ag){
     // Golden goal extra time: check each minute, stop as soon as a goal is scored
-    const hgp=t1.attack*t2.defence/10000;
-    const agp=t2.attack*t1.defence/10000;
+    const hgp=1.05*t1.attack*t2.defence/10000;
+    const agp=1.05*t2.attack*t1.defence/10000;
     let ggScored=false;
     for(let i=0;i<30&&!ggScored;i++){
       const hGoal=Math.random()<hgp/90;
