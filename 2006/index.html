@@ -612,7 +612,7 @@ const T = {
   Argentina:    {country:'Argentina',    attack:156.11,defence:85.64,  confed:'SAM',squad:[['Crespo',22],['Saviola',17],['Tevez',14],['Riquelme',9],['Maxi Rodríguez',8],['Messi',5],['Palacio',4],['Aimar',3],['Sorín',3],['Ayala',2],['Cambiasso',2],['J. Cruz',2],['Lucho González',2],['Burdisso',1],['Coloccini',1],['Cufré',1],['G. Milito',1],['Heinze',1],['Mascherano',1],['Scaloni',1]]},
   Paraguay:     {country:'Paraguay',     attack:106.62,defence:99.48,  confed:'SAM',squad:[['Santa Cruz',28],['Valdez',16],['Cuevas',12],['Paredes',8],['Riveros',7],['Cabañas',5],['D. López',3],['Gavilán',3],['J. dos Santos',3],['Barreto',2],['Gamarra',2],['R. Acuña',2],['Toledo',2],['Bonet',1],['Caniza',1],['Cáceres',1],['Montiel',1],['J. Núñez',1],['Manzur',1],['P. da Silva',1]]},
   Tunisia:      {country:'Tunisia',      attack:105.80, defence:106.38,  confed:'AFR',squad:[['Jaziri',24],['Chikhaoui',16],['Santos',12],['Guemamdia',10],['Ben Saada',8],['Ghodhbane',5],['Mnari',4],['Chedli',3],['Jaïdi',3],['Bouazizi',2],['Haggui',2],['Melliti',2],['Namouchi',2],['Ayari',1],['Essediri',1],['Jemmali',1],['Nafti',1],['Saidi',1],['Trabelsi',1],['Yahia',1]]},
-  Ecuador:     {country:'Ecuador',     attack:95.85,defence:115.49,  confed:'SAM',squad:[['A. Delgado',28],['C. Tenorio',16],['Kaviedes',10],['E. Méndez',8],['A. Valencia',7],['C. Benítez',6],[Borja',5],['Castillo',3],['de la Cruz',2],['Hurtado',2],['Lara',2],['M. Ayoví',2],['Urrutia',2],['Ambrosi',1],['E. Tenorio',1],['G. Espinoza',1],['Guagua',1],['Perlaza',1],['Reasco',1],['Saritama',1]]},
+  Ecuador:     {country:'Ecuador',     attack:95.85,defence:115.49,  confed:'SAM',squad:[['A. Delgado',28],['C. Tenorio',16],['Kaviedes',10],['E. Méndez',8],['A. Valencia',7],['C. Benítez',6],['Borja',5],['Castillo',3],['de la Cruz',2],['Hurtado',2],['Lara',2],['M. Ayoví',2],['Urrutia',2],['Ambrosi',1],['E. Tenorio',1],['G. Espinoza',1],['Guagua',1],['Perlaza',1],['Reasco',1],['Saritama',1]]},
   Ivory_Coast:     {country:'Ivory Coast',     attack:117.30,defence:104.76,  confed:'AFR',squad:[['Drogba',32],['Dindane',13],['B. Koné',10],['A. Koné',9],['B. Kalou',7],['Y. Touré',6],['A. K. Keïta',5],['Romaric',3],['K. Akalé',2],['K. Touré',2],['Yapi Yapo',2],['A. Méïté',1],['Boka',1],['Demel',1],['Domoraud',1],['E. Faé',1],['Eboué',1],['Kouassi',1],['Zokora',1],['Zoro',1]]},
   Australia:     {country:'Australia',     attack:127.73,defence:88.59,  confed:'OFC',squad:[['Cahill',22],['Viduka',17],['Kewell',13],['Aloisi',10],['A. Thompson',5],['Bresciano',4],['Emerton',4],['Kennedy',4],['Sterjovski',4],['Chipperfield',3],['Skoko',3],['C. Moore',2],['Popovic',2],['Beauchamp',1],['Culina',1],['Grella',1],['Lazaridis',1],['Milligan',1],['Neill',1],['Wilkshire',1]]},
   Ghana:     {country:'Ghana',     attack:87.55,defence:108.18,  confed:'AFR',squad:[['Gyan',29],['M. Amoah',16],['Muntari',13],['Appiah',8],['Essien',6],['O. Addo',5],['Pimpong',4],['Tachie-Mensah',4],['Draman',2],['J. Mensah',2],['S. Kuffour',2],['D. Boateng',1],['E. Addo',1],['H. Mohamed',1],['I. Ahmed',1],['Paintsil',1],['Pappoe',1],['Quaye',1],['Sarpei',1],['Shilla',1]]},
@@ -903,12 +903,9 @@ function initTournament(){
     };
     for(const g of Object.values(draw))if(groupFails(g,lim)){ok=false;break;}
   }
-  // Shuffle within each group, keeping the Pot 1 seed at index 0
-  for(const grp of Object.values(draw)){
-    const seed=grp[0];
-    const rest=grp.slice(1);
-    shuffle(rest);
-    grp[0]=seed; grp[1]=rest[0]; grp[2]=rest[1]; grp[3]=rest[2];
+  for(const[name,grp]of Object.entries(draw)){
+    if(name==='Group A'){const br=grp[0];shuffle(grp);const idx=grp.indexOf(br);[grp[0],grp[idx]]=[grp[idx],grp[0]];}
+    else shuffle(grp);
   }
   const groupData={};
   for(const[gname,teams]of Object.entries(draw)){
