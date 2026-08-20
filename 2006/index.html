@@ -903,9 +903,11 @@ function initTournament(){
     };
     for(const g of Object.values(draw))if(groupFails(g,lim)){ok=false;break;}
   }
-  for(const[name,grp]of Object.entries(draw)){
-    if(name==='Group A'){const br=grp[0];shuffle(grp);const idx=grp.indexOf(br);[grp[0],grp[idx]]=[grp[idx],grp[0]];}
-    else shuffle(grp);
+  for(const grp of Object.values(draw)){
+    const seed=grp[0];
+    const rest=grp.slice(1);
+    shuffle(rest);
+    grp[0]=seed; grp[1]=rest[0]; grp[2]=rest[1]; grp[3]=rest[2];
   }
   const groupData={};
   for(const[gname,teams]of Object.entries(draw)){
