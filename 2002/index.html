@@ -1288,7 +1288,7 @@ function renderContent(){
     }
     const cnt={};
     for(const[name,team]of S.allGoalscorers){if(!cnt[name])cnt[name]={g:0,team};cnt[name].g++;}
-    const all=Object.entries(cnt).sort((a,b)=>b[1].g-a[1].g);
+    const all=Object.entries(cnt).sort((a,b)=>b[1].g-a[1].g || a[1].team.country.localeCompare(b[1].team.country) || a[0].localeCompare(b[0]));
     const top=all.slice(0,10);
     h+=`<div class="section-card"><div class="section-title">TOP GOALSCORERS</div>
       <table class="scorers-table"><thead><tr><th>#</th><th>Player</th><th style="text-align:right">Goals</th></tr></thead>
@@ -1331,7 +1331,7 @@ function renderGroupMatches(gname,gd){
 function openAllScorers(){
   const cnt={};
   for(const[name,team]of S.allGoalscorers){if(!cnt[name])cnt[name]={g:0,team};cnt[name].g++;}
-  const all=Object.entries(cnt).sort((a,b)=>b[1].g-a[1].g);
+  const all=Object.entries(cnt).sort((a,b)=>b[1].g-a[1].g || a[1].team.country.localeCompare(b[1].team.country) || a[0].localeCompare(b[0]));
   document.getElementById('scorers-modal-body').innerHTML=`
     <table class="scorers-table" style="width:100%">
       <thead><tr><th>#</th><th>Player</th><th style="text-align:right">Goals</th></tr></thead>
